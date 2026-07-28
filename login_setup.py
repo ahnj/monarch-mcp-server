@@ -125,9 +125,6 @@ async def main():
         print(f"⚠️  Could not check version: {e}")
 
     try:
-        secure_session.delete_token()
-        print("🗑️ Cleared existing secure sessions")
-
         print("\nHow do you sign in to Monarch Money?")
         print(
             "  1) Session cookies from browser   "
