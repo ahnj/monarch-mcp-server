@@ -66,9 +66,18 @@ async def monarch_logout() -> str:
 async def check_auth_status() -> str:
     """Check if already authenticated with Monarch Money."""
     try:
-        token = secure_session.load_token()
-        if token:
-            status = "✅ Authentication token found in secure keyring storage\n"
+        # load_token() only ever inspects the "token" key, so it reports a
+        # false negative for cookie-mode sessions (auth_mode="cookie"), which
+        # carry a "cookies" dict and no top-level token. Check the full
+        # session so a valid cookie-only login — the recommended, long-lived
+        # auth path — is correctly recognized as authenticated.
+        session = secure_session.load_session()
+        has_token = bool(session and isinstance(session.get("token"), str) and session.get("token"))
+        has_cookies = bool(session and isinstance(session.get("cookies"), dict) and session.get("cookies"))
+
+        if has_token or has_cookies:
+            auth_mode = session.get("auth_mode", "cookie" if has_cookies else "token")
+            status = f"✅ Authenticated session found in secure keyring storage (auth_mode={auth_mode})\n"
         else:
             status = "❌ No authentication token found in keyring\n"
 
