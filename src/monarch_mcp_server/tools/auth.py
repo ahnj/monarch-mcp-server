@@ -66,18 +66,29 @@ async def monarch_logout() -> str:
 async def check_auth_status() -> str:
     """Check if already authenticated with Monarch Money."""
     try:
-        token = secure_session.load_token()
-        if token:
-            status = "✅ Authentication token found in secure keyring storage\n"
+        session = secure_session.load_session()
+        if not session:
+            status = "❌ No stored session found in keyring\n"
         else:
-            status = "❌ No authentication token found in keyring\n"
+            if session.get("auth_mode") == "cookie":
+                count = len(session.get("cookies") or {})
+                status = (
+                    "✅ Cookie session found in secure keyring storage "
+                    f"({count} cookies)\n"
+                )
+            else:
+                status = "✅ Token session found in secure keyring storage\n"
+            if session.get("device_uuid"):
+                status += "🔑 Device UUID recorded\n"
 
         email = os.getenv("MONARCH_EMAIL")
         if email:
             status += f"📧 Environment email: {email}\n"
 
         status += (
-            "\n💡 Try get_accounts to test connection or run login_setup.py if needed."
+            "\n💡 A stored session can still be expired — Monarch then answers "
+            "401 Unauthorized. Call get_accounts to confirm it still works, or "
+            "run login_setup.py to re-authenticate."
         )
 
         return status
@@ -89,10 +100,24 @@ async def check_auth_status() -> str:
 async def debug_session_loading() -> str:
     """Debug keyring session loading issues."""
     try:
-        token = secure_session.load_token()
-        if token:
-            return "✅ Token found in keyring."
-        return "❌ No token found in keyring. Run login_setup.py to authenticate."
+        session = secure_session.load_session()
+        if not session:
+            return "❌ No session found in keyring. Run login_setup.py to authenticate."
+
+        auth_mode = session.get("auth_mode", "token")
+        parts = [f"✅ Session found in keyring (auth_mode: {auth_mode})."]
+        if session.get("token"):
+            parts.append("Carries a session token.")
+        cookies = session.get("cookies") or {}
+        if cookies:
+            parts.append(f"Carries {len(cookies)} session cookies.")
+        if session.get("device_uuid"):
+            parts.append("Device UUID recorded.")
+        parts.append(
+            "Loading a session does not prove it is still valid — call "
+            "get_accounts to check for a 401."
+        )
+        return " ".join(parts)
     except Exception as e:
         logger.exception("Keyring access failed")
         return f"❌ Keyring access failed: {type(e).__name__}: {e}"
